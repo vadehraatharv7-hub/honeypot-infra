@@ -635,3 +635,13 @@ resource "azurerm_linux_virtual_machine" "db_vm" {
   EOF
   )
 }
+
+
+resource "local_file" "ansible_inventory" {
+  filename = "../ansible/inventory.ini"
+  content = templatefile("inventory.tftpl", {
+    honeypot_ip   = azurerm_public_ip.pip.ip_address
+    monitoring_ip = azurerm_public_ip.pip_monitoring.ip_address
+    db_private_ip = azurerm_network_interface.db_nic.private_ip_address
+  })
+}
