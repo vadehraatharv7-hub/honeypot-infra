@@ -4,12 +4,16 @@
     path: /usr/local/go/bin/go
   register: go_bin
 
-- name: Download and extract Go 1.23.0
+- name: Remove existing Go installation
+  file:
+    path: /usr/local/go
+    state: absent
+
+- name: Download and extract Go 1.27.1
   unarchive:
-    src: "https://golang.org/dl/go1.23.0.linux-amd64.tar.gz"
+    src: "https://golang.org/dl/go1.27.1.linux-amd64.tar.gz"
     dest: /usr/local
     remote_src: yes
-  when: not go_bin.stat.exists
 
 - name: Copy xpd-shield directory
   copy:

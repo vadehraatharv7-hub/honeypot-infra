@@ -21,17 +21,21 @@
 # =========================================================================
 # 2. Go Toolchain Installation
 # =========================================================================
-- name: Check if Go 1.22.0 is installed
+- name: Check if Go 1.27.1 is installed
   ansible.builtin.stat:
     path: /usr/local/go/bin/go
   register: go_bin
 
-- name: Download and extract Go 1.22.0 tarball
+- name: Remove existing Go installation
+  ansible.builtin.file:
+    path: /usr/local/go
+    state: absent
+
+- name: Download and extract Go 1.27.1 tarball
   ansible.builtin.unarchive:
-    src: "https://golang.org/dl/go1.22.0.linux-amd64.tar.gz"
+    src: "https://golang.org/dl/go1.27.1.linux-amd64.tar.gz"
     dest: /usr/local
     remote_src: yes
-  when: not go_bin.stat.exists
 
 - name: Add Go to global system PATH
   ansible.builtin.copy:
