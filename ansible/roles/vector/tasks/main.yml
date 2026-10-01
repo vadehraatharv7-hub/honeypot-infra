@@ -1,0 +1,41 @@
+---
+- name: Install curl
+  apt:
+    name: curl
+    state: present
+    update_cache: yes
+
+- name: Download and install Vector
+  shell: curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
+  args:
+    creates: /root/.vector/bin/vector
+
+- name: Copy Vector configuration
+  template:
+    src: vector.toml.j2
+    dest: /etc/vector/vector.toml
+    mode: '0644'
+  notify: Restart Vector
+
+- name: Create systemd service for Vector
+  copy:
+    dest: /etc/systemd/system/vector.service
+    content: |
+      [Unit]
+      Description=Vector Log Shipper
+      After=network-online.target
+
+      [Service]
+      ExecStart=/root/.vector/bin/vector --config /etc/vector/vector.toml
+      Restart=always
+      Environment="COSMOS_DB_URI={{ cosmos_mongo_uri }}"
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start Vector service
+  systemd:
+    name: vector
+    state: started
+    enabled: yes
+    daemon_reload: yes

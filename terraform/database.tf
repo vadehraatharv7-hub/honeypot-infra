@@ -16,6 +16,19 @@ resource "azurerm_cosmosdb_account" "cosmos_db" {
   # Activates the lifetime 1,000 RU/s and 25GB free tier
   free_tier_enabled             = true
   public_network_access_enabled = false
+  is_virtual_network_filter_enabled = true
+
+  virtual_network_rule {
+    id = azurerm_subnet.subnet.id
+  }
+
+  virtual_network_rule {
+    id = azurerm_subnet.subnet_snare.id
+  }
+
+  virtual_network_rule {
+    id = azurerm_subnet.subnet_monitoring.id
+  }
 
   capabilities {
     name = "EnableMongo"

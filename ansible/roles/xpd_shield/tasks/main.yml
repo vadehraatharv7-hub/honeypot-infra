@@ -1,0 +1,32 @@
+---
+- name: Ensure golang is installed
+  apt:
+    name: golang
+    state: present
+    update_cache: yes
+
+- name: Copy xpd-shield directory
+  copy:
+    src: "{{ playbook_dir }}/../../xpd-shield"
+    dest: /opt/
+    owner: root
+    group: root
+
+- name: Build xpd-shield
+  command: go build -o xpd-shield .
+  args:
+    chdir: /opt/xpd-shield
+    creates: /opt/xpd-shield/xpd-shield
+
+- name: Create xpd-shield service file
+  template:
+    src: xpd-shield.service.j2
+    dest: /etc/systemd/system/xpd-shield.service
+  notify: restart xpd-shield
+
+- name: Ensure xpd-shield is enabled and started
+  systemd:
+    name: xpd-shield
+    state: started
+    enabled: yes
+    daemon_reload: yes

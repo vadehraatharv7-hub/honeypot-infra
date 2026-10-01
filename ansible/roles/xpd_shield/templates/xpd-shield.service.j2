@@ -1,0 +1,13 @@
+[Unit]
+Description=xpd-shield eBPF Agent
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/xpd-shield/xpd-shield
+WorkingDirectory=/opt/xpd-shield
+Restart=on-failure
+Environment="REDIS_ADDR={{ groups['monitoring'][0] }}:6379"
+
+[Install]
+WantedBy=multi-user.target

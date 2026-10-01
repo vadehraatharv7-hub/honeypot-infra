@@ -1,0 +1,27 @@
+[sources.honeypot_json_logs]
+type = "file"
+include = [
+  "/var/log/honeypot/*.json",
+  "/opt/cowrie/var/log/cowrie/cowrie.json"
+]
+read_from = "beginning"
+
+[transforms.parse_json]
+type = "remap"
+inputs = ["honeypot_json_logs"]
+source = '''
+  . = parse_json!(.message)
+'''
+
+[sinks.cosmos_db_mongodb]
+type = "mongodb"
+inputs = ["parse_json"]
+endpoint = "{{ cosmos_db_uri }}"
+database = "honeypot_db"
+collection = "logs"
+
+[sinks.realtime_dashboard]
+type = "http"
+inputs = ["parse_json"]
+uri = "http://{{ monitoring_ip }}:8080/api/ingest/stream"
+encoding.codec = "json"

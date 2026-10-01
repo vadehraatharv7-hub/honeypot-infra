@@ -114,6 +114,7 @@ resource "local_file" "ansible_inventory" {
     honeypot_ip   = azurerm_public_ip.pip.ip_address
     snare_ip      = azurerm_public_ip.pip_snare.ip_address
     monitoring_ip = azurerm_public_ip.pip_monitoring.ip_address
+    cosmos_db_uri = azurerm_cosmosdb_account.cosmos_db.primary_mongodb_connection_string
   })
 }
 
