@@ -1,9 +1,15 @@
 ---
-- name: Ensure golang is installed
-  apt:
-    name: golang
-    state: present
-    update_cache: yes
+- name: Check if Go is installed
+  stat:
+    path: /usr/local/go/bin/go
+  register: go_bin
+
+- name: Download and extract Go 1.23.0
+  unarchive:
+    src: "https://golang.org/dl/go1.23.0.linux-amd64.tar.gz"
+    dest: /usr/local
+    remote_src: yes
+  when: not go_bin.stat.exists
 
 - name: Copy xpd-shield directory
   copy:
@@ -13,7 +19,7 @@
     group: root
 
 - name: Build xpd-shield
-  command: go build -o xpd-shield .
+  command: /usr/local/go/bin/go build -o xpd-shield .
   args:
     chdir: /opt/xpd-shield
     creates: /opt/xpd-shield/xpd-shield
