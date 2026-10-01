@@ -8,7 +8,7 @@ output "monitoring_vm_public_ip" {
   description = "Public IP address of the SecDash monitoring & operations VM"
 }
 
-output "database_private_ip" {
-  description = "The internal IP address of the isolated Database VM (Redis & MongoDB)"
-  value       = azurerm_linux_virtual_machine.db_vm.private_ip_address
+output "snare_private_ip" {
+  description = "The internal IP address of the snare honeypot sensor vm"
+  value       = azurerm_public_ip.pip_snare.ip_address
 }

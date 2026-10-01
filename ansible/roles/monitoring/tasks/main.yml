@@ -1,0 +1,162 @@
+---
+# =========================================================================
+# 1. Base OS Packages & System Dependencies
+# =========================================================================
+- name: Install foundational packages and Nginx
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - git
+      - nginx
+      - wget
+      - fail2ban
+      - unattended-upgrades
+      - build-essential
+    state: present
+    update_cache: yes
+
+# =========================================================================
+# 2. Go Toolchain Installation
+# =========================================================================
+- name: Check if Go 1.22.0 is installed
+  ansible.builtin.stat:
+    path: /usr/local/go/bin/go
+  register: go_bin
+
+- name: Download and extract Go 1.22.0 tarball
+  ansible.builtin.unarchive:
+    src: "https://golang.org/dl/go1.22.0.linux-amd64.tar.gz"
+    dest: /usr/local
+    remote_src: yes
+  when: not go_bin.stat.exists
+
+- name: Add Go to global system PATH
+  ansible.builtin.copy:
+    dest: /etc/profile.d/golang.sh
+    content: 'export PATH=$PATH:/usr/local/go/bin'
+    mode: '0644'
+
+# =========================================================================
+# 3. Node.js & PM2 Installation
+# =========================================================================
+- name: Check if Node.js repository keyring exists
+  ansible.builtin.stat:
+    path: /etc/apt/keyrings/nodesource.gpg
+  register: nodesource_keyring
+
+- name: Add NodeSource signing key
+  ansible.builtin.shell: |
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+  when: not nodesource_keyring.stat.exists
+
+- name: Add NodeSource repository (Node.js 20.x)
+  ansible.builtin.deb822_repository:
+    name: nodesource
+    types: [deb]
+    uris: [https://deb.nodesource.com/node_20.x]
+    suites: [nodistro]
+    components: [main]
+    signed_by: /etc/apt/keyrings/nodesource.gpg
+    state: present
+
+- name: Install Node.js
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: Install PM2 globally
+  community.general.npm:
+    name: pm2
+    global: yes
+    state: present
+
+# =========================================================================
+# 4. Clone and Build SecDash (Backend & Frontend)
+# =========================================================================
+- name: Ensure app directory exists
+  ansible.builtin.file:
+    path: /home/azureuser/app
+    state: directory
+    owner: azureuser
+    group: azureuser
+    mode: '0755'
+
+- name: Copy local SecDash repository
+  ansible.builtin.copy:
+    src: /home/marcos_007/Documents/project/sec_dash/
+    dest: /home/azureuser/app/
+    owner: azureuser
+    group: azureuser
+
+- name: Build Go backend binary
+  ansible.builtin.shell:
+    cmd: /usr/local/go/bin/go build -o api-server ./cmd/server
+    chdir: /home/azureuser/app/backend
+  become_user: azureuser
+
+- name: Install frontend dependencies
+  community.general.npm:
+    path: /home/azureuser/app/frontend
+  become_user: azureuser
+
+- name: Build React frontend production bundle
+  ansible.builtin.shell:
+    cmd: npm run build
+    chdir: /home/azureuser/app/frontend
+  environment:
+    NODE_OPTIONS: "--max-old-space-size=1024"
+  become_user: azureuser
+
+# =========================================================================
+# 5. Process Management (PM2)
+# =========================================================================
+- name: Check running PM2 processes
+  ansible.builtin.command:
+    cmd: pm2 list
+  become_user: azureuser
+  register: pm2_status
+  changed_when: false
+
+- name: Start Go backend in PM2
+  ansible.builtin.command:
+    cmd: pm2 start /home/azureuser/app/backend/api-server --name "go-backend"
+  become_user: azureuser
+  when: "'go-backend' not in pm2_status.stdout"
+
+- name: Start React frontend serving in PM2
+  ansible.builtin.command:
+    cmd: pm2 serve /home/azureuser/app/frontend/dist 3000 --name "react-frontend" --spa
+  become_user: azureuser
+  when: "'react-frontend' not in pm2_status.stdout"
+
+- name: Save PM2 process list
+  ansible.builtin.command: pm2 save
+  become_user: azureuser
+
+- name: Configure PM2 startup script
+  ansible.builtin.shell: env PATH=$PATH:/usr/bin pm2 startup systemd -u azureuser --hp /home/azureuser
+  become: yes
+  become_user: root
+
+# =========================================================================
+# 6. Configure Nginx Reverse Proxy
+# =========================================================================
+- name: Deploy Nginx reverse proxy configuration
+  ansible.builtin.template:
+    src: nginx_secdash.conf.j2
+    dest: /etc/nginx/sites-available/default
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload Nginx
+
+- name: Ensure Nginx is running and enabled
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+    enabled: yes

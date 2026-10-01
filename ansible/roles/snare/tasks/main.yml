@@ -1,0 +1,80 @@
+---
+- name: Ensure Docker and dependencies are installed
+  apt:
+    name: ['docker.io', 'docker-compose-v2', 'python3-docker', 'curl']
+    state: present
+    update_cache: yes
+
+- name: Ensure Snare working directory exists
+  file:
+    path: /home/azureuser/snare
+    state: directory
+    owner: azureuser
+    group: azureuser
+
+- name: Deploy Snare & Tanner Docker Compose File
+  copy:
+    dest: /home/azureuser/snare/docker-compose.yml
+    content: |
+      services:
+        redis:
+          image: redis:alpine
+          restart: always
+        tanner:
+          image: dtagdevsec/tanner:24.04
+          restart: always
+          depends_on:
+            - redis
+        snare:
+          image: dtagdevsec/snare:24.04
+          restart: always
+          ports:
+            - "80:80"
+          depends_on:
+            - tanner
+    owner: azureuser
+    group: azureuser
+
+- name: Start Snare & Tanner Stack
+  community.docker.docker_compose_v2:
+    project_src: /home/azureuser/snare
+    state: present
+
+- name: Deploy JSON Log Forwarder script
+  copy:
+    dest: /usr/local/bin/snare-forwarder.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Tail Snare's docker logs natively and pipe to your Go backend
+      docker logs -f snare-snare-1 | grep --line-buffered '{' | while read -r line; do
+        [ -n "$line" ] && curl -s -X POST http://10.0.2.4:8080/api/ingest/web \
+            -H "Content-Type: application/json" \
+            -d "$line" > /dev/null
+      done
+
+- name: Deploy JSON Log Forwarder Service
+  copy:
+    dest: /etc/systemd/system/snare-forwarder.service
+    content: |
+      [Unit]
+      Description=Snare Native JSON Forwarder
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=simple
+      User=root
+      ExecStart=/usr/local/bin/snare-forwarder.sh
+      Restart=always
+      RestartSec=3
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start Snare Forwarder service
+  systemd:
+    name: snare-forwarder
+    state: started
+    enabled: yes
+    daemon_reload: yes

@@ -1,11 +1,9 @@
 [honeypot]
 ${honeypot_ip} ansible_user=azureuser ansible_port=22222 ansible_ssh_private_key_file=~/.ssh/id_rsa_azure
 
+[snare]
+${snare_ip} ansible_user=azureuser ansible_port=22222 ansible_ssh_private_key_file=~/.ssh/id_rsa_azure
+
 [monitoring]
 ${monitoring_ip} ansible_user=azureuser ansible_port=22222 ansible_ssh_private_key_file=~/.ssh/id_rsa_azure
 
-[database]
-${db_private_ip} ansible_user=azureuser ansible_port=22 ansible_ssh_private_key_file=~/.ssh/id_rsa_azure
-
-[database:vars]
-ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -q azureuser@${monitoring_ip} -p 22222 -i ~/.ssh/id_rsa_azure"'

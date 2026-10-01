@@ -1,0 +1,193 @@
+---
+
+- name: Disable password auth
+  ansible.builtin.replace:
+    path: /etc/ssh/sshd_config
+    regexp: '^#*PasswordAuthentication .*'
+    replace: 'PasswordAuthentication no'
+  notify: Restart SSH
+
+- name: Disable root login
+  ansible.builtin.replace:
+    path: /etc/ssh/sshd_config
+    regexp: '^#*PermitRootLogin .*'
+    replace: 'PermitRootLogin no'
+  notify: Restart SSH
+
+- name: Create swap file if not exists
+  ansible.builtin.command: dd if=/dev/zero of=/swapfile bs=1M count=1024
+  args:
+    creates: /swapfile
+
+- name: Configure swap
+  ansible.builtin.shell: |
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+  when: ansible_swaptotal_mb == 0
+
+- name: Add swap to fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: '/swapfile none swap sw 0 0'
+    state: present
+
+- name: Install dependencies
+  ansible.builtin.apt:
+    name:
+      - software-properties-common
+      - iptables-persistent
+      - wget
+      - curl
+      - gpg
+      - python3
+      - python3-venv
+      - python3-dev
+      - git
+      - libssl-dev
+      - libffi-dev
+      - build-essential
+      - fail2ban
+      - unattended-upgrades
+    state: present
+    update_cache: yes
+
+- name: Configure fail2ban
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [sshd]
+      enabled = true
+      port = 22222
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+      bantime = 3600
+  notify: Restart fail2ban
+
+- name: Enable unattended upgrades
+  ansible.builtin.shell: |
+    echo unattended-upgrades unattended-upgrades/enable_auto_updates boolean true | debconf-set-selections
+    dpkg-reconfigure -f noninteractive unattended-upgrades
+
+- name: Create cowrie group
+  ansible.builtin.group:
+    name: cowrie
+    state: present
+
+- name: Create cowrie user
+  ansible.builtin.user:
+    name: cowrie
+    group: cowrie
+    shell: /usr/sbin/nologin
+    create_home: yes
+    home: /home/cowrie
+
+- name: Clone Cowrie
+  ansible.builtin.git:
+    repo: https://github.com/cowrie/cowrie.git
+    dest: /home/cowrie/cowrie
+  become_user: cowrie
+
+- name: Setup python env for cowrie
+  ansible.builtin.shell: |
+    python3 -m venv /home/cowrie/cowrie/cowrie-env
+    /home/cowrie/cowrie/cowrie-env/bin/pip install --upgrade pip setuptools wheel
+    /home/cowrie/cowrie/cowrie-env/bin/pip install -r /home/cowrie/cowrie/requirements.txt
+    /home/cowrie/cowrie/cowrie-env/bin/pip install /home/cowrie/cowrie
+  become_user: cowrie
+  args:
+    creates: /home/cowrie/cowrie/cowrie-env/bin/cowrie
+
+- name: Configure cowrie userdb
+  ansible.builtin.copy:
+    dest: /home/cowrie/cowrie/etc/userdb.txt
+    content: |
+      root:0:root
+      root:0:admin
+      root:0:password
+      root:0:123456
+      admin:500:admin
+      ubuntu:1000:ubuntu
+    owner: cowrie
+    group: cowrie
+
+- name: Redirect port 22 to 2222 for cowrie
+  ansible.builtin.iptables:
+    table: nat
+    chain: PREROUTING
+    protocol: tcp
+    destination_port: 22
+    jump: REDIRECT
+    to_ports: 2222
+
+- name: Save iptables
+  ansible.builtin.command: netfilter-persistent save
+
+- name: Deploy cowrie systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/cowrie.service
+    content: |
+      [Unit]
+      Description=Cowrie SSH Honeypot Sandbox
+      After=network.target
+
+      [Service]
+      Type=forking
+      User=cowrie
+      Group=cowrie
+      WorkingDirectory=/home/cowrie/cowrie
+      PIDFile=/home/cowrie/cowrie/var/run/cowrie.pid
+
+      Environment="PATH=/home/cowrie/cowrie/cowrie-env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+      ExecStart=/home/cowrie/cowrie/cowrie-env/bin/cowrie start
+      ExecStop=/home/cowrie/cowrie/cowrie-env/bin/cowrie stop
+
+      Restart=always
+      RestartSec=5
+
+      NoNewPrivileges=yes
+      ProtectSystem=strict
+      ProtectHome=read-only
+      ReadWritePaths=/home/cowrie/cowrie/var /home/cowrie/cowrie/etc
+      PrivateTmp=yes
+      ProtectKernelTunables=yes
+      ProtectControlGroups=yes
+      RestrictSUIDSGID=yes
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Restart cowrie
+
+- name: Create JSON Log Forwarder script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/cowrie-forwarder.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      tail -n 0 -F /home/cowrie/cowrie/var/log/cowrie/cowrie.json | while read -r line; do
+        [ -n "$line" ] && curl -s -X POST http://10.0.2.4:8080/api/ingest/cowrie \
+            -H "Content-Type: application/json" \
+            -d "$line" > /dev/null
+      done
+
+- name: Deploy cowrie forwarder systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/cowrie-forwarder.service
+    content: |
+      [Unit]
+      Description=Cowrie Native JSON Forwarder
+      After=network.target
+      Requires=cowrie.service
+
+      [Service]
+      Type=simple
+      User=root
+      ExecStart=/usr/local/bin/cowrie-forwarder.sh
+      Restart=always
+      RestartSec=3
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Restart cowrie-forwarder

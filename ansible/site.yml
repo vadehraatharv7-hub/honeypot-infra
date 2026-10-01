@@ -1,0 +1,17 @@
+---
+- name: Configure the Honeypot Tier
+  hosts: honeypot
+  become: true
+  roles:
+    - honeypot
+- name: Configure the Monitoring Hub Tier
+  hosts: monitoring
+  become: true
+  roles:
+    - monitoring
+
+- name: Configure the Snare Web Honeypot
+  hosts: snare
+  become: true
+  roles:
+    - snare
