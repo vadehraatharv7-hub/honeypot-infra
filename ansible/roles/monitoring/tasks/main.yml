@@ -122,6 +122,14 @@
   register: pm2_status
   changed_when: false
 
+- name: Create .env file for Go backend
+  ansible.builtin.copy:
+    dest: /home/azureuser/app/backend/.env
+    content: "MONGO_URI={{ cosmos_db_uri }}\n"
+    owner: azureuser
+    group: azureuser
+    mode: '0600'
+
 - name: Start Go backend in PM2
   ansible.builtin.command:
     cmd: pm2 start /home/azureuser/app/backend/api-server --name "go-backend"

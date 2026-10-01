@@ -3,15 +3,20 @@
   hosts: honeypot
   become: true
   roles:
+    - vector
     - honeypot
+    - xpd_shield
 - name: Configure the Monitoring Hub Tier
   hosts: monitoring
   become: true
   roles:
     - monitoring
+    - redis
 
 - name: Configure the Snare Web Honeypot
   hosts: snare
   become: true
   roles:
+    - vector
     - snare
+    - xpd_shield
