@@ -32,6 +32,11 @@
     line: '/swapfile none swap sw 0 0'
     state: present
 
+- name: Add deadsnakes PPA for Python 3.11
+  ansible.builtin.apt_repository:
+    repo: ppa:deadsnakes/ppa
+    state: present
+
 - name: Install dependencies
   ansible.builtin.apt:
     name:
@@ -40,7 +45,9 @@
       - wget
       - curl
       - gpg
-      - python3
+      - python3.11
+      - python3.11-venv
+      - python3.11-dev
       - python3-venv
       - python3-dev
       - git
@@ -91,7 +98,7 @@
 
 - name: Setup python env for cowrie
   ansible.builtin.shell: |
-    python3 -m venv /home/cowrie/cowrie/cowrie-env
+    python3.11 -m venv /home/cowrie/cowrie/cowrie-env
     /home/cowrie/cowrie/cowrie-env/bin/pip install --upgrade pip setuptools wheel
     /home/cowrie/cowrie/cowrie-env/bin/pip install -r /home/cowrie/cowrie/requirements.txt
     /home/cowrie/cowrie/cowrie-env/bin/pip install /home/cowrie/cowrie
