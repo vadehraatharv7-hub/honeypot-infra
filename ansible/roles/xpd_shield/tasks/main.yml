@@ -15,12 +15,11 @@
     dest: /usr/local
     remote_src: yes
 
-- name: Copy xpd-shield directory
-  copy:
-    src: "{{ playbook_dir }}/../../xpd-shield"
-    dest: /opt/
-    owner: root
-    group: root
+- name: Clone xpd-shield from GitHub
+  ansible.builtin.git:
+    repo: "https://github.com/vadehraatharv7-hub/xdp-shield.git"
+    dest: /opt/xpd-shield
+    version: main
 
 - name: Build xpd-shield
   command: /usr/local/go/bin/go build -o xpd-shield .
