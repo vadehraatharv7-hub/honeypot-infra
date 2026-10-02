@@ -5,16 +5,10 @@
     state: present
     update_cache: yes
 
-- name: Add Vector APT repository
-  shell: curl -1sLf 'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' | sudo -E bash
-  args:
-    creates: /etc/apt/sources.list.d/timber-vector.list
-
-- name: Install Vector
+- name: Install Vector via direct DEB package
   apt:
-    name: vector
+    deb: https://packages.timber.io/vector/0.38.0/vector_0.38.0-1_amd64.deb
     state: present
-    update_cache: yes
 
 - name: Ensure /etc/vector directory exists
   file:
