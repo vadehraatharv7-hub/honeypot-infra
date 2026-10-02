@@ -5,10 +5,16 @@
     state: present
     update_cache: yes
 
-- name: Download and install Vector
-  shell: curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
+- name: Add Vector APT repository
+  shell: curl -1sLf 'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' | sudo -E bash
   args:
-    creates: /root/.vector/bin/vector
+    creates: /etc/apt/sources.list.d/timber-vector.list
+
+- name: Install Vector
+  apt:
+    name: vector
+    state: present
+    update_cache: yes
 
 - name: Ensure /etc/vector directory exists
   file:
@@ -23,21 +29,12 @@
     mode: '0644'
   notify: Restart Vector
 
-- name: Create systemd service for Vector
+- name: Set Cosmos DB URI environment variable for Vector
   copy:
-    dest: /etc/systemd/system/vector.service
+    dest: /etc/default/vector
     content: |
-      [Unit]
-      Description=Vector Log Shipper
-      After=network-online.target
-
-      [Service]
-      ExecStart=/root/.vector/bin/vector --config /etc/vector/vector.toml
-      Restart=always
-      Environment="COSMOS_DB_URI={{ cosmos_db_uri }}"
-
-      [Install]
-      WantedBy=multi-user.target
+      COSMOS_DB_URI="{{ cosmos_db_uri }}"
+  notify: Restart Vector
 
 - name: Enable and start Vector service
   systemd:
