@@ -1,31 +1,28 @@
----
-- name: Check if Go is installed
-  stat:
-    path: /usr/local/go/bin/go
-  register: go_bin
-
-- name: Remove existing Go installation
-  file:
-    path: /usr/local/go
-    state: absent
-
-- name: Download and extract Go 1.27.1
-  unarchive:
-    src: "https://golang.org/dl/go1.27.1.linux-amd64.tar.gz"
-    dest: /usr/local
-    remote_src: yes
-
-- name: Clone xpd-shield from GitHub
-  ansible.builtin.git:
-    repo: "https://github.com/vadehraatharv7-hub/xdp-shield.git"
-    dest: /opt/xpd-shield
-    version: main
-
-- name: Build xpd-shield
-  command: /usr/local/go/bin/go build -o xpd-shield .
+- name: Build xpd-shield locally on the Ansible controller
+  command: go build -o xpd-shield .
   args:
-    chdir: /opt/xpd-shield
-    creates: /opt/xpd-shield/xpd-shield
+    chdir: "{{ playbook_dir }}/../../xpd-shield"
+  environment:
+    GOOS: linux
+    GOARCH: amd64
+  delegate_to: localhost
+  run_once: true
+
+- name: Ensure /opt/xpd-shield directory exists
+  file:
+    path: /opt/xpd-shield
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Distribute compiled binary to honeypots
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../xpd-shield/xpd-shield"
+    dest: /opt/xpd-shield/xpd-shield
+    owner: root
+    group: root
+    mode: '0755'
 
 - name: Create xpd-shield service file
   template:
