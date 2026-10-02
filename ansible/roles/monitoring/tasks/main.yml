@@ -98,11 +98,34 @@
     force: yes
   become_user: azureuser
 
-- name: Build Go backend binary
+- name: Clone SecDash locally on controller
+  ansible.builtin.git:
+    repo: https://github.com/vadehraatharv7-hub/sec_dash.git
+    dest: /tmp/sec_dash
+    version: main
+    force: yes
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Build Go backend binary locally on controller
   ansible.builtin.shell:
-    cmd: /usr/local/go/bin/go build -o api-server ./cmd/server
-    chdir: /home/azureuser/app/backend
-  become_user: azureuser
+    cmd: go build -o api-server ./cmd/server
+    chdir: /tmp/sec_dash/backend
+  environment:
+    GOOS: linux
+    GOARCH: amd64
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Copy backend binary to monitoring VM
+  ansible.builtin.copy:
+    src: /tmp/sec_dash/backend/api-server
+    dest: /home/azureuser/app/backend/api-server
+    owner: azureuser
+    group: azureuser
+    mode: '0755'
 
 - name: Install frontend dependencies
   community.general.npm:
@@ -135,17 +158,23 @@
     group: azureuser
     mode: '0600'
 
-- name: Start Go backend in PM2
-  ansible.builtin.command:
-    cmd: pm2 start /home/azureuser/app/backend/api-server --name "go-backend"
+- name: Start or Restart Go backend in PM2
+  ansible.builtin.shell: |
+    if pm2 list | grep -q "go-backend"; then
+      pm2 restart go-backend
+    else
+      pm2 start /home/azureuser/app/backend/api-server --name "go-backend"
+    fi
   become_user: azureuser
-  when: "'go-backend' not in pm2_status.stdout"
 
-- name: Start React frontend serving in PM2
-  ansible.builtin.command:
-    cmd: pm2 serve /home/azureuser/app/frontend/dist 3000 --name "react-frontend" --spa
+- name: Start or Restart React frontend serving in PM2
+  ansible.builtin.shell: |
+    if pm2 list | grep -q "react-frontend"; then
+      pm2 restart react-frontend
+    else
+      pm2 serve /home/azureuser/app/frontend/dist 3000 --name "react-frontend" --spa
+    fi
   become_user: azureuser
-  when: "'react-frontend' not in pm2_status.stdout"
 
 - name: Save PM2 process list
   ansible.builtin.command: pm2 save
