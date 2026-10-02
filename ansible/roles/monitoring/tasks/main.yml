@@ -90,12 +90,13 @@
     group: azureuser
     mode: '0755'
 
-- name: Copy local SecDash repository
-  ansible.builtin.copy:
-    src: /home/marcos_007/Documents/project/sec_dash/
+- name: Clone SecDash repository
+  ansible.builtin.git:
+    repo: https://github.com/vadehraatharv7-hub/sec_dash.git
     dest: /home/azureuser/app/
-    owner: azureuser
-    group: azureuser
+    version: main
+    force: yes
+  become_user: azureuser
 
 - name: Build Go backend binary
   ansible.builtin.shell:
