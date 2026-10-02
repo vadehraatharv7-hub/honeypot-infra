@@ -198,3 +198,17 @@
       [Install]
       WantedBy=multi-user.target
   notify: Restart cowrie-forwarder
+
+- name: Enable and start cowrie service
+  ansible.builtin.systemd:
+    name: cowrie
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Enable and start cowrie-forwarder service
+  ansible.builtin.systemd:
+    name: cowrie-forwarder
+    state: started
+    enabled: yes
+    daemon_reload: yes
