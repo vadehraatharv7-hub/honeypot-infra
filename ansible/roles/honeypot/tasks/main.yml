@@ -90,6 +90,19 @@
     create_home: yes
     home: /home/cowrie
 
+- name: Add vector user to cowrie group for log access
+  ansible.builtin.user:
+    name: vector
+    groups: cowrie
+    append: yes
+  ignore_errors: yes
+
+- name: Ensure /home/cowrie has group execute permissions
+  ansible.builtin.file:
+    path: /home/cowrie
+    state: directory
+    mode: '0750'
+
 - name: Clone Cowrie
   ansible.builtin.git:
     repo: https://github.com/cowrie/cowrie.git
@@ -167,48 +180,9 @@
       WantedBy=multi-user.target
   notify: Restart cowrie
 
-- name: Create JSON Log Forwarder script
-  ansible.builtin.copy:
-    dest: /usr/local/bin/cowrie-forwarder.sh
-    mode: '0755'
-    content: |
-      #!/bin/bash
-      tail -n 0 -F /home/cowrie/cowrie/var/log/cowrie/cowrie.json | while read -r line; do
-        [ -n "$line" ] && curl -s -X POST http://10.0.2.4:8080/api/ingest/cowrie \
-            -H "Content-Type: application/json" \
-            -d "$line" > /dev/null
-      done
-
-- name: Deploy cowrie forwarder systemd service
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/cowrie-forwarder.service
-    content: |
-      [Unit]
-      Description=Cowrie Native JSON Forwarder
-      After=network.target
-      Requires=cowrie.service
-
-      [Service]
-      Type=simple
-      User=root
-      ExecStart=/usr/local/bin/cowrie-forwarder.sh
-      Restart=always
-      RestartSec=3
-
-      [Install]
-      WantedBy=multi-user.target
-  notify: Restart cowrie-forwarder
-
 - name: Enable and start cowrie service
   ansible.builtin.systemd:
     name: cowrie
-    state: started
-    enabled: yes
-    daemon_reload: yes
-
-- name: Enable and start cowrie-forwarder service
-  ansible.builtin.systemd:
-    name: cowrie-forwarder
     state: started
     enabled: yes
     daemon_reload: yes

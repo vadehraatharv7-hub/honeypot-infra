@@ -163,7 +163,7 @@
     if pm2 list | grep -q "go-backend"; then
       pm2 restart go-backend
     else
-      pm2 start /home/azureuser/app/backend/api-server --name "go-backend"
+      pm2 start /home/azureuser/app/backend/api-server --name "go-backend" --cwd /home/azureuser/app/backend
     fi
   become_user: azureuser
 
