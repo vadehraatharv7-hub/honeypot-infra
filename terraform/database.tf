@@ -15,20 +15,7 @@ resource "azurerm_cosmosdb_account" "cosmos_db" {
 
   # Activates the lifetime 1,000 RU/s and 25GB free tier
   free_tier_enabled             = true
-  public_network_access_enabled = true
-  is_virtual_network_filter_enabled = true
-
-  virtual_network_rule {
-    id = azurerm_subnet.subnet.id
-  }
-
-  virtual_network_rule {
-    id = azurerm_subnet.subnet_snare.id
-  }
-
-  virtual_network_rule {
-    id = azurerm_subnet.subnet_monitoring.id
-  }
+  public_network_access_enabled = false
 
   capabilities {
     name = "EnableMongo"
@@ -50,4 +37,35 @@ resource "azurerm_cosmosdb_mongo_database" "mongo_db" {
   resource_group_name = azurerm_resource_group.rg.name
   account_name        = azurerm_cosmosdb_account.cosmos_db.name
   throughput          = 400 # Covered entirely by the free tier
+}
+
+resource "azurerm_private_dns_zone" "cosmos_dns" {
+  name                = "privatelink.mongo.cosmos.azure.com"
+  resource_group_name = azurerm_resource_group.rg.name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "vnet_link" {
+  name                  = "vnet-link"
+  resource_group_name   = azurerm_resource_group.rg.name
+  private_dns_zone_name = azurerm_private_dns_zone.cosmos_dns.name
+  virtual_network_id    = azurerm_virtual_network.vnet.id
+}
+
+resource "azurerm_private_endpoint" "cosmos_pe" {
+  name                = "pe-cosmos"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  subnet_id           = azurerm_subnet.subnet_database.id
+
+  private_service_connection {
+    name                           = "psc-cosmos"
+    private_connection_resource_id = azurerm_cosmosdb_account.cosmos_db.id
+    subresource_names              = ["MongoDB"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name                 = "cosmos-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.cosmos_dns.id]
+  }
 }
