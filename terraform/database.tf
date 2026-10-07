@@ -15,7 +15,7 @@ resource "azurerm_cosmosdb_account" "cosmos_db" {
 
   # Activates the lifetime 1,000 RU/s and 25GB free tier
   free_tier_enabled             = true
-  public_network_access_enabled = false
+  public_network_access_enabled = true
   is_virtual_network_filter_enabled = true
 
   virtual_network_rule {
