@@ -29,7 +29,7 @@ resource "azurerm_network_security_group" "nsg" {
     destination_address_prefix = "*"
   }
 
-  # Allow Honeypot to send JSON logs to the Monitoring VM (Port 8080)
+  # Allow Honeypot to send JSON logs to the Monitoring VM (Port 8081)
   security_rule {
     name                       = "Allow-Outbound-To-Monitoring"
     priority                   = 200
@@ -37,7 +37,7 @@ resource "azurerm_network_security_group" "nsg" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "8080"
+    destination_port_range     = "8081"
     source_address_prefix      = "10.0.1.0/24"
     destination_address_prefix = "10.0.2.4"
   }
@@ -71,7 +71,7 @@ resource "azurerm_network_security_group" "nsg_monitoring" {
     source_address_prefixes    = ["10.0.1.0/24", "10.0.4.0/24"]
     source_port_range          = "*"
     destination_address_prefix = "*"
-    destination_port_range     = "8080"
+    destination_port_range     = "8081"
   }
 
   security_rule {
@@ -138,7 +138,7 @@ resource "azurerm_network_security_group" "nsg_snare" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "8080"
+    destination_port_range     = "8081"
     source_address_prefix      = "10.0.4.0/24"
     destination_address_prefix = "10.0.2.4"
   }

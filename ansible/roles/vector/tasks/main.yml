@@ -28,6 +28,13 @@
     dest: /etc/default/vector
     content: |
       COSMOS_DB_URI="{{ cosmos_db_uri }}"
+      VECTOR_CONFIG="/etc/vector/vector.toml"
+  notify: Restart Vector
+
+- name: Remove default vector.yaml
+  file:
+    path: /etc/vector/vector.yaml
+    state: absent
   notify: Restart Vector
 
 - name: Enable and start Vector service
