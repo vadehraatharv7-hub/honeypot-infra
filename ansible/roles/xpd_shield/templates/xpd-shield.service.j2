@@ -7,7 +7,7 @@ Type=simple
 ExecStart=/opt/xpd-shield/xpd-shield
 WorkingDirectory=/opt/xpd-shield
 Restart=on-failure
-Environment="REDIS_ADDR={{ groups['monitoring'][0] }}:6379"
+Environment="API_URL=http://{{ groups['monitoring'][0] }}:8081/api/threats/banned"
 
 [Install]
 WantedBy=multi-user.target
