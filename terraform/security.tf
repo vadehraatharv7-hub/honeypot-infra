@@ -170,7 +170,7 @@ resource "azurerm_network_security_group" "db_nsg" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_ranges    = ["27017", "6379"]
+    destination_port_range     = "27017"
     source_address_prefix      = azurerm_subnet.subnet_monitoring.address_prefixes[0]
     destination_address_prefix = "*"
   }

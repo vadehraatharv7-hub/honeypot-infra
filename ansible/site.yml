@@ -11,7 +11,6 @@
   become: true
   roles:
     - monitoring
-    - redis
 
 - name: Configure the Snare Web Honeypot
   hosts: snare
