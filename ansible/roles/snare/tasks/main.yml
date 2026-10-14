@@ -17,14 +17,16 @@
     dest: /home/azureuser/snare/docker-compose.yml
     content: |
       services:
-        redis:
+        tanner_redis:
           image: redis:alpine
           restart: always
         tanner:
           image: dtagdevsec/tanner:24.04
           restart: always
+          volumes:
+            - /home/azureuser/snare/tanner_logs:/tmp/tanner
           depends_on:
-            - redis
+            - tanner_redis
         snare:
           image: dtagdevsec/snare:24.04
           restart: always
@@ -46,11 +48,12 @@
     mode: '0755'
     content: |
       #!/bin/bash
-      # Tail Snare's docker logs natively and pipe to your Go backend
-      docker logs -f snare-snare-1 | grep --line-buffered '{' | while read -r line; do
-        [ -n "$line" ] && curl -s -X POST http://10.0.2.4:8080/api/ingest/web \
+      tail -F /home/azureuser/snare/tanner_logs/tanner.log | grep --line-buffered 'Requested path' | while read -r line; do
+        path=$(echo "$line" | awk -F'Requested path ' '{print $2}')
+        json="{\"eventid\": \"snare.http.request\", \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"src_ip\": \"9.205.27.115\", \"src_port\": 80, \"dst_port\": 80, \"protocol\": \"HTTP\", \"input\": \"GET $path HTTP/1.1\"}"
+        curl -m 2 -s -X POST "http://10.0.2.4:8081/api/ingest/stream?sensor=vm-snare" \
             -H "Content-Type: application/json" \
-            -d "$line" > /dev/null
+            -d "$json" > /dev/null
       done
 
 - name: Deploy JSON Log Forwarder Service
