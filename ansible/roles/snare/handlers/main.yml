@@ -1,0 +1,6 @@
+---
+- name: Restart snare forwarder
+  systemd:
+    name: snare-forwarder
+    state: restarted
+    daemon_reload: yes

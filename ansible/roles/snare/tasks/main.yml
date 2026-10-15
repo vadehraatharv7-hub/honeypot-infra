@@ -50,42 +50,42 @@
     project_src: /home/azureuser/snare
     state: present
 
-- name: Deploy JSON Log Forwarder script
+- name: Install python3 for the log forwarder
+  apt:
+    name: python3
+    state: present
+
+- name: Remove the old bash forwarder
+  file:
+    path: /usr/local/bin/snare-forwarder.sh
+    state: absent
+
+- name: Deploy Snare log forwarder (reads Snare's access log, which carries the client IP)
   copy:
-    dest: /usr/local/bin/snare-forwarder.sh
+    src: snare-forwarder.py
+    dest: /usr/local/bin/snare-forwarder.py
     mode: '0755'
-    content: |
-      #!/bin/bash
-      tail -F /home/azureuser/snare/tanner_logs/tanner.log | grep --line-buffered 'Requested path' | while read -r line; do
-        path=$(echo "$line" | awk -F'Requested path ' '{print $2}')
-        # Use the client IP if the log line carries one; never invent one
-        ip=$(echo "$line" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n1)
-        ip_field=""
-        [ -n "$ip" ] && ip_field="\"src_ip\": \"$ip\", "
-        json="{\"eventid\": \"snare.http.request\", \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", ${ip_field}\"src_port\": 80, \"dst_port\": 80, \"protocol\": \"HTTP\", \"input\": \"GET $path HTTP/1.1\"}"
-        curl -m 2 -s -X POST "http://10.0.2.4:8081/api/ingest/stream?sensor=vm-snare" \
-            -H "Content-Type: application/json" \
-            -d "$json" > /dev/null
-      done
+  notify: Restart snare forwarder
 
 - name: Deploy JSON Log Forwarder Service
   copy:
     dest: /etc/systemd/system/snare-forwarder.service
     content: |
       [Unit]
-      Description=Snare Native JSON Forwarder
+      Description=Snare to SecDash log forwarder
       After=docker.service
       Requires=docker.service
 
       [Service]
       Type=simple
       User=root
-      ExecStart=/usr/local/bin/snare-forwarder.sh
+      ExecStart=/usr/local/bin/snare-forwarder.py
       Restart=always
       RestartSec=3
 
       [Install]
       WantedBy=multi-user.target
+  notify: Restart snare forwarder
 
 - name: Enable and start Snare Forwarder service
   systemd:
