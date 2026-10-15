@@ -159,6 +159,16 @@
   become: false
   no_log: true
 
+# Admin account for the dashboard login. The password lives in
+# ~/.secdash_admin_password on the controller (mode 0600) and is written to the
+# VM's .env, where the backend applies it at startup.
+- name: Read or create the dashboard admin password (on the controller)
+  ansible.builtin.set_fact:
+    secdash_admin_password: "{{ lookup('ansible.builtin.password', lookup('ansible.builtin.env', 'HOME') + '/.secdash_admin_password length=24 chars=ascii_letters,digits') }}"
+  delegate_to: localhost
+  become: false
+  no_log: true
+
 - name: Create .env file for Go backend
   ansible.builtin.copy:
     dest: /home/azureuser/app/backend/.env
@@ -166,6 +176,8 @@
     content: |
       MONGO_URI={{ cosmos_db_uri }}
       DASH_TOKEN={{ secdash_token }}
+      DASH_ADMIN_USER=admin
+      DASH_ADMIN_PASSWORD={{ secdash_admin_password }}
       MAX_EVENTS=100000
     owner: azureuser
     group: azureuser
@@ -173,7 +185,7 @@
 
 - name: Tell the operator where the dashboard token is
   ansible.builtin.debug:
-    msg: "Dashboard login token is stored on this machine in ~/.secdash_token"
+    msg: "Dashboard login: user admin, password in ~/.secdash_admin_password (API token in ~/.secdash_token)"
   run_once: true
 
 - name: Start or Restart Go backend in PM2
