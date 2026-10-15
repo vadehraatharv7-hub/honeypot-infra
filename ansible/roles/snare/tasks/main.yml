@@ -12,6 +12,14 @@
     owner: azureuser
     group: azureuser
 
+- name: Create Tanner log directory writable by the container user
+  file:
+    path: /home/azureuser/snare/tanner_logs
+    state: directory
+    owner: root
+    group: root
+    mode: '0777'
+
 - name: Deploy Snare & Tanner Docker Compose File
   copy:
     dest: /home/azureuser/snare/docker-compose.yml

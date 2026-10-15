@@ -47,7 +47,7 @@ resource "azurerm_linux_virtual_machine" "vm_monitoring" {
 
   admin_ssh_key {
     username   = "azureuser"
-    public_key = file("~/.ssh/id_rsa_azure.pub")
+    public_key = file(pathexpand("~/.ssh/id_rsa_azure.pub"))
   }
 
   os_disk {
@@ -68,9 +68,6 @@ resource "azurerm_linux_virtual_machine" "vm_monitoring" {
   systemctl restart sshd
   EOF
   )
-
-
-
 }
 
 

@@ -1,7 +1,7 @@
 - name: Build xpd-shield locally on the Ansible controller
   command: go build -o xpd-shield .
   args:
-    chdir: "{{ playbook_dir }}/../../xpd-shield"
+    chdir: "{{ playbook_dir }}/../../xdp-shield"
   environment:
     GOOS: linux
     GOARCH: amd64
@@ -19,7 +19,7 @@
 
 - name: Distribute compiled binary to honeypots
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../xpd-shield/xpd-shield"
+    src: "{{ playbook_dir }}/../../xdp-shield/xpd-shield"
     dest: /opt/xpd-shield/xpd-shield
     owner: root
     group: root
