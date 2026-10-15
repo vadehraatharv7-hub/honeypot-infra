@@ -19,3 +19,6 @@ type = "http"
 inputs = ["parse_json"]
 uri = "http://10.0.2.4:8081/api/ingest/stream"
 encoding.codec = "json"
+
+[sinks.realtime_dashboard.request.headers]
+X-Ingest-Key = "${INGEST_KEY}"

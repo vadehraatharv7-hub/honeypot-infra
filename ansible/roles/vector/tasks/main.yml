@@ -23,12 +23,25 @@
     mode: '0644'
   notify: Restart Vector
 
-- name: Set Cosmos DB URI environment variable for Vector
+# Shared secret the sensors send with every event (X-Ingest-Key). It is created
+# once on the controller in ~/.secdash_ingest_key (mode 0600) and reused.
+- name: Read or create the sensor ingest key (on the controller)
+  ansible.builtin.set_fact:
+    secdash_ingest_key: "{{ lookup('ansible.builtin.password', lookup('ansible.builtin.env', 'HOME') + '/.secdash_ingest_key length=40 chars=ascii_letters,digits') }}"
+  no_log: true
+
+# The database connection string is deliberately NOT written here: the sensors
+# are the most exposed machines and have no use for it.
+- name: Remove the database URI from Vector's environment, add the ingest key
   copy:
     dest: /etc/default/vector
     content: |
-      COSMOS_DB_URI="{{ cosmos_db_uri }}"
+      INGEST_KEY="{{ secdash_ingest_key }}"
       VECTOR_CONFIG="/etc/vector/vector.toml"
+    owner: root
+    group: vector
+    mode: '0640'
+  no_log: true
   notify: Restart Vector
 
 - name: Remove default vector.yaml

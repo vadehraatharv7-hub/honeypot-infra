@@ -169,6 +169,11 @@
   become: false
   no_log: true
 
+- name: Read or create the sensor ingest key (on the controller)
+  ansible.builtin.set_fact:
+    secdash_ingest_key: "{{ lookup('ansible.builtin.password', lookup('ansible.builtin.env', 'HOME') + '/.secdash_ingest_key length=40 chars=ascii_letters,digits') }}"
+  no_log: true
+
 - name: Create .env file for Go backend
   ansible.builtin.copy:
     dest: /home/azureuser/app/backend/.env
@@ -176,6 +181,7 @@
     content: |
       MONGO_URI={{ cosmos_db_uri }}
       DASH_TOKEN={{ secdash_token }}
+      INGEST_TOKEN={{ secdash_ingest_key }}
       DASH_ADMIN_USER=admin
       DASH_ADMIN_PASSWORD={{ secdash_admin_password }}
       MAX_EVENTS=100000
@@ -218,6 +224,45 @@
 # =========================================================================
 # 6. Configure Nginx Reverse Proxy
 # =========================================================================
+- name: Create the TLS directory
+  ansible.builtin.file:
+    path: /etc/ssl/secdash
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Generate a self-signed TLS certificate for the dashboard
+  ansible.builtin.command: >-
+    openssl req -x509 -newkey rsa:2048 -nodes -days 825
+    -keyout /etc/ssl/secdash/privkey.pem -out /etc/ssl/secdash/fullchain.pem
+    -subj "/CN=secdash"
+  args:
+    creates: /etc/ssl/secdash/fullchain.pem
+  notify: Reload Nginx
+
+- name: Restrict the TLS private key
+  ansible.builtin.file:
+    path: /etc/ssl/secdash/privkey.pem
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Ensure the nginx snippets directory exists
+  ansible.builtin.file:
+    path: /etc/nginx/snippets
+    state: directory
+    mode: '0755'
+
+- name: Deploy the dashboard proxy locations
+  ansible.builtin.template:
+    src: nginx_secdash_locations.conf.j2
+    dest: /etc/nginx/snippets/secdash_locations.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload Nginx
+
 - name: Deploy Nginx reverse proxy configuration
   ansible.builtin.template:
     src: nginx_secdash.conf.j2

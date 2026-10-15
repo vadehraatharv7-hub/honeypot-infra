@@ -1,0 +1,4 @@
+---
+# Redirect plain HTTP to HTTPS. Leave false until port 443 is open in the NSG
+# (terraform apply) and you have accepted the self-signed certificate once.
+secdash_force_https: false

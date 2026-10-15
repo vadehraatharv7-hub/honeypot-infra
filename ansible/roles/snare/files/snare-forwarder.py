@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Ships Snare web-honeypot requests to the SecDash ingest endpoint.
+"""Ships web-honeypot requests to the SecDash ingest endpoint.
 
-Snare's own access log (inside the container) is the only place that records the
-real client address; Tanner's log does not. This follows that log, builds one
-JSON event per request and POSTs batches to SecDash.
+The front proxy's access log is where the real client address is recorded (the
+Snare/Tanner logs only see the proxy). This follows that log, builds one JSON
+event per request and POSTs it to SecDash.
 """
 import json
 import os
@@ -15,12 +15,13 @@ import urllib.request
 from datetime import datetime, timezone
 
 INGEST = os.environ.get("SECDASH_INGEST", "http://10.0.2.4:8081/api/ingest/stream?sensor=vm-snare")
-CONTAINER = os.environ.get("SNARE_CONTAINER", "snare-snare-1")
-LOGFILE = "/opt/snare/snare.log"
+LOGFILE = os.environ.get("ACCESS_LOG", "/home/azureuser/snare/nginx_logs/access.log")
+INGEST_KEY = os.environ.get("SECDASH_INGEST_KEY", "")
 STATE = os.environ.get("STATE_FILE", "/var/lib/snare-forwarder/last_ts")
 
+# nginx log format "hp": $remote_addr [$time_local] "$request" $status $bytes "$referer" "$ua"
 LINE = re.compile(
-    r'aiohttp\.access:log: (?P<ip>\S+) \[(?P<ts>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) HTTP/[\d.]+" '
+    r'^(?P<ip>\S+) \[(?P<ts>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+)(?: HTTP/[\d.]+)?" '
     r'(?P<status>\d{3}) \S+ "[^"]*" "(?P<ua>.*)"$'
 )
 
@@ -64,7 +65,10 @@ def parse(line):
 
 
 def post(batch):
-    req = urllib.request.Request(INGEST, data=json.dumps(batch).encode(), headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    if INGEST_KEY:
+        headers["X-Ingest-Key"] = INGEST_KEY
+    req = urllib.request.Request(INGEST, data=json.dumps(batch).encode(), headers=headers)
     with urllib.request.urlopen(req, timeout=5) as r:
         return r.status < 300
 
@@ -73,7 +77,7 @@ def main():
     last = load_state()
     pending = []
     proc = subprocess.Popen(
-        ["docker", "exec", CONTAINER, "tail", "-n", "+1", "-F", LOGFILE],
+        ["tail", "-n", "+1", "-F", LOGFILE],
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1,
     )
     for line in proc.stdout:
@@ -90,7 +94,7 @@ def main():
                 print("ingest failed: %s" % exc, file=sys.stderr)
                 pending = pending[-1000:]
                 time.sleep(2)
-    return proc.wait() or 1  # container stopped; systemd restarts us
+    return proc.wait() or 1  # tail exited; systemd restarts us
 
 
 if __name__ == "__main__":

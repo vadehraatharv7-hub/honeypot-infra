@@ -141,6 +141,45 @@
     jump: REDIRECT
     to_ports: 2222
 
+- name: Deploy Cowrie configuration (identity, Telnet, limits)
+  ansible.builtin.template:
+    src: cowrie.cfg.j2
+    dest: /home/cowrie/cowrie/etc/cowrie.cfg
+    owner: cowrie
+    group: cowrie
+    mode: '0644'
+  notify: Restart cowrie
+
+- name: Redirect port 23 to 2223 for cowrie telnet
+  ansible.builtin.iptables:
+    table: nat
+    chain: PREROUTING
+    protocol: tcp
+    destination_port: 23
+    jump: REDIRECT
+    to_ports: 2223
+
+# A single address cannot hold open an unbounded number of connections on the
+# 1 GB sensor. `-C` makes the rule idempotent.
+- name: Limit concurrent connections per source IP to the decoy ports
+  ansible.builtin.shell: |
+    for p in 2222 2223; do
+      iptables -C INPUT -p tcp --syn --dport $p -m connlimit --connlimit-above {{ cowrie_conn_limit }} --connlimit-mask 32 -j DROP 2>/dev/null \
+        || iptables -I INPUT 1 -p tcp --syn --dport $p -m connlimit --connlimit-above {{ cowrie_conn_limit }} --connlimit-mask 32 -j DROP
+    done
+  changed_when: false
+
+- name: Purge old captures, recordings and rotated logs (attackers control their size)
+  ansible.builtin.cron:
+    name: "Purge old cowrie captures"
+    minute: "30"
+    hour: "3"
+    user: root
+    job: >-
+      find /home/cowrie/cowrie/var/lib/cowrie/downloads /home/cowrie/cowrie/var/lib/cowrie/tty
+      -type f -mtime +{{ cowrie_retention_days }} -delete;
+      find /home/cowrie/cowrie/var/log/cowrie -name 'cowrie.json.*' -mtime +{{ cowrie_retention_days }} -delete
+
 - name: Save iptables
   ansible.builtin.command: netfilter-persistent save
 
@@ -175,6 +214,14 @@
       ProtectKernelTunables=yes
       ProtectControlGroups=yes
       RestrictSUIDSGID=yes
+      PrivateDevices=yes
+      ProtectKernelModules=yes
+      LockPersonality=yes
+      CapabilityBoundingSet=
+      RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+      # a connection flood must not take the whole 1 GB VM down
+      MemoryMax=450M
+      TasksMax=256
 
       [Install]
       WantedBy=multi-user.target

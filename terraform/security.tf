@@ -29,6 +29,19 @@ resource "azurerm_network_security_group" "nsg" {
     destination_address_prefix = "*"
   }
 
+  # Telnet decoy (Cowrie telnet, redirected 23 -> 2223): the main entry point for IoT botnets
+  security_rule {
+    name                       = "allow-decoy-telnet"
+    priority                   = 120
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "23"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
   # Allow Honeypot to send JSON logs to the Monitoring VM (Port 8081)
   security_rule {
     name                       = "Allow-Outbound-To-Monitoring"
@@ -53,6 +66,44 @@ resource "azurerm_network_security_group" "nsg" {
     destination_port_range     = "*"
     source_address_prefix      = "10.0.1.0/24"
     destination_address_prefix = "10.0.0.0/16"
+  }
+
+  # Egress filtering: a decoy should not be usable as a relay. Software updates and
+  # sample downloads need web access, so only 80/443 and NTP leave; everything else is dropped.
+  security_rule {
+    name                       = "Allow-Web-Egress"
+    priority                   = 220
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_ranges    = ["80", "443"]
+    source_address_prefix      = "10.0.1.0/24"
+    destination_address_prefix = "Internet"
+  }
+
+  security_rule {
+    name                       = "Allow-NTP-Egress"
+    priority                   = 230
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Udp"
+    source_port_range          = "*"
+    destination_port_range     = "123"
+    source_address_prefix      = "10.0.1.0/24"
+    destination_address_prefix = "Internet"
+  }
+
+  security_rule {
+    name                       = "Deny-Other-Egress"
+    priority                   = 400
+    direction                  = "Outbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "10.0.1.0/24"
+    destination_address_prefix = "Internet"
   }
 }
 
@@ -97,6 +148,19 @@ resource "azurerm_network_security_group" "nsg_monitoring" {
     source_port_range          = "*"
     destination_address_prefix = "*"
     destination_port_range     = "80"
+  }
+
+  # HTTPS for the dashboard (self-signed certificate until a real one is installed)
+  security_rule {
+    name                       = "Allow-HTTPS-Web"
+    priority                   = 150
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_address_prefix      = var.admin_public_ip
+    source_port_range          = "*"
+    destination_address_prefix = "*"
+    destination_port_range     = "443"
   }
 }
 
@@ -154,6 +218,44 @@ resource "azurerm_network_security_group" "nsg_snare" {
     destination_port_range     = "*"
     source_address_prefix      = "10.0.4.0/24"
     destination_address_prefix = "10.0.0.0/16"
+  }
+
+  # Egress filtering: a decoy should not be usable as a relay. Software updates and
+  # sample downloads need web access, so only 80/443 and NTP leave; everything else is dropped.
+  security_rule {
+    name                       = "Allow-Web-Egress"
+    priority                   = 220
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_ranges    = ["80", "443"]
+    source_address_prefix      = "10.0.4.0/24"
+    destination_address_prefix = "Internet"
+  }
+
+  security_rule {
+    name                       = "Allow-NTP-Egress"
+    priority                   = 230
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Udp"
+    source_port_range          = "*"
+    destination_port_range     = "123"
+    source_address_prefix      = "10.0.4.0/24"
+    destination_address_prefix = "Internet"
+  }
+
+  security_rule {
+    name                       = "Deny-Other-Egress"
+    priority                   = 400
+    direction                  = "Outbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "10.0.4.0/24"
+    destination_address_prefix = "Internet"
   }
 }
 
