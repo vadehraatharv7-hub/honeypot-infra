@@ -150,13 +150,31 @@
   register: pm2_status
   changed_when: false
 
+# The dashboard access token is generated once on the controller and kept in
+# ~/.secdash_token (mode 0600) so re-runs keep the same token.
+- name: Read or create the dashboard access token (on the controller)
+  ansible.builtin.set_fact:
+    secdash_token: "{{ lookup('ansible.builtin.password', lookup('ansible.builtin.env', 'HOME') + '/.secdash_token length=40 chars=ascii_letters,digits') }}"
+  delegate_to: localhost
+  become: false
+  no_log: true
+
 - name: Create .env file for Go backend
   ansible.builtin.copy:
     dest: /home/azureuser/app/backend/.env
-    content: "MONGO_URI={{ cosmos_db_uri }}\n"
+    # MAX_EVENTS is sized for the 1 GB monitoring VM (about 45 MB per 100k events, plus cached analytics)
+    content: |
+      MONGO_URI={{ cosmos_db_uri }}
+      DASH_TOKEN={{ secdash_token }}
+      MAX_EVENTS=100000
     owner: azureuser
     group: azureuser
     mode: '0600'
+
+- name: Tell the operator where the dashboard token is
+  ansible.builtin.debug:
+    msg: "Dashboard login token is stored on this machine in ~/.secdash_token"
+  run_once: true
 
 - name: Start or Restart Go backend in PM2
   ansible.builtin.shell: |

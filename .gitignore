@@ -1,0 +1,6 @@
+# Contains the Cosmos DB connection string and SSH details
+ansible/inventory.ini
+# Terraform state holds secrets (keys, connection strings)
+*.tfstate
+*.tfstate.*
+terraform/.terraform/
