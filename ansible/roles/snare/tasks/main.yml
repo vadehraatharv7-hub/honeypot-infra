@@ -179,6 +179,7 @@
     dest: /etc/default/snare-forwarder
     content: |
       SECDASH_INGEST_KEY={{ secdash_ingest_key }}
+      SECDASH_INGEST=http://{{ monitoring_private_ip | default('10.0.2.4') }}:8081/api/ingest/stream?sensor=vm-snare
     owner: root
     group: root
     mode: '0600'

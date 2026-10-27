@@ -32,10 +32,29 @@
     line: '/swapfile none swap sw 0 0'
     state: present
 
-- name: Add deadsnakes PPA for Python 3.11
-  ansible.builtin.apt_repository:
-    repo: ppa:deadsnakes/ppa
+# The repository is added directly. `apt_repository: ppa:...` asks Launchpad's web API for details first
+# and fails whenever that API is slow (it timed out in a real run), although the package archive itself is fast.
+# The key is fetched by its full fingerprint F23C5A6C...A755776, the one deadsnakes publishes.
+- name: Install what the repository module needs
+  ansible.builtin.apt:
+    name: python3-debian
     state: present
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Add the deadsnakes repository (Python 3.11)
+  ansible.builtin.deb822_repository:
+    name: deadsnakes
+    types: [deb]
+    uris: ["https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu"]
+    suites: ["{{ ansible_distribution_release }}"]
+    components: [main]
+    signed_by: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF23C5A6CF475977595C89F51BA6932366A755776"
+    state: present
+  register: deadsnakes_repo
+  retries: 5
+  delay: 10
+  until: deadsnakes_repo is succeeded
 
 - name: Install dependencies
   ansible.builtin.apt:

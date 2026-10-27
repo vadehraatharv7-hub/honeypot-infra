@@ -17,7 +17,7 @@ source = '''
 [sinks.realtime_dashboard]
 type = "http"
 inputs = ["parse_json"]
-uri = "http://10.0.2.4:8081/api/ingest/stream"
+uri = "http://{{ monitoring_private_ip | default('10.0.2.4') }}:8081/api/ingest/stream"
 encoding.codec = "json"
 
 [sinks.realtime_dashboard.request.headers]
