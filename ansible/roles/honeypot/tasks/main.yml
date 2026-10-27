@@ -109,12 +109,15 @@
     create_home: yes
     home: /home/cowrie
 
+# A running process keeps the groups it started with. Vector is installed (and started) before the
+# cowrie group exists, so without this restart it never gains access to Cowrie's logs and silently
+# ships nothing (seen in a real deployment).
 - name: Add vector user to cowrie group for log access
   ansible.builtin.user:
     name: vector
     groups: cowrie
     append: yes
-  ignore_errors: yes
+  notify: Restart Vector
 
 - name: Ensure /home/cowrie has group execute permissions
   ansible.builtin.file:

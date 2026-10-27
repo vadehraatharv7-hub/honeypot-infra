@@ -20,5 +20,18 @@ inputs = ["parse_json"]
 uri = "http://{{ monitoring_private_ip | default('10.0.2.4') }}:8081/api/ingest/stream"
 encoding.codec = "json"
 
+# Nothing may be lost. The file position only advances once the dashboard has confirmed a batch,
+# and failed batches are retried.
+acknowledgements.enabled = true
+
+# Replaying a large backlog (for example after Vector was blocked or restarted) must not exceed the
+# database's request-unit budget (Cosmos DB free tier: 400 RU/s, roughly 6 RU per event). One request
+# per second of at most 30 events stays well under it and still keeps up with live traffic.
+batch.max_events = 30
+batch.timeout_secs = 1
+request.concurrency = 1
+request.rate_limit_duration_secs = 1
+request.rate_limit_num = 1
+
 [sinks.realtime_dashboard.request.headers]
 X-Ingest-Key = "${INGEST_KEY}"
